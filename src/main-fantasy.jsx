@@ -4,7 +4,10 @@ import './fantasy.css';
 
 const CRAFTING_DATA_URL = 'https://ohmi69.github.io/osms_datamine_dashboard/data/current/crafting.json';
 const OVERVIEW_DATA_URL = 'https://ohmi69.github.io/osms_datamine_dashboard/data/current/overview.json';
+const LOOKUPS_DATA_URL = 'https://ohmi69.github.io/osms_datamine_dashboard/data/current/lookups.json';
 const EXPECTED_RECIPES = 342;
+const MAPLESTORY_IO_REGION = 'GMS';
+const MAPLESTORY_IO_VERSION = '83';
 
 const PROFESSIONS = ['Smithing', 'Weaponcrafting', 'Tailoring', 'Woodcrafting', 'Leatherworking', 'Arcforge'];
 const PROF_META = {
@@ -46,6 +49,58 @@ function flattenRecipes(data) {
   );
 }
 
+function buildNameToIdMap(lookups) {
+  const map = new Map();
+  Object.entries(lookups?.item_names || {}).forEach(([id, name]) => {
+    if (!name) return;
+    const exactKey = normalizeName(name);
+    if (!map.has(exactKey)) map.set(exactKey, id);
+  });
+  return map;
+}
+
+function normalizeName(name) {
+  return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function resolveItemId(name, nameToId, directId = null) {
+  if (directId) return String(directId);
+  return nameToId.get(normalizeName(name)) || null;
+}
+
+function maplestoryIconUrls(itemId) {
+  if (!itemId) return [];
+  return [
+    `https://maplestory.io/api/${MAPLESTORY_IO_REGION}/${MAPLESTORY_IO_VERSION}/item/${itemId}/icon?resize=2`,
+    `https://maplestory.io/api/${MAPLESTORY_IO_REGION}/latest/item/${itemId}/icon?resize=2`,
+    `https://labs.maplestory.io/api/gms/latest/item/${itemId}/iconRaw`
+  ];
+}
+
+function EmojiFallback({ name }) {
+  return <span className="emoji-fallback">{materialIcon(name)}</span>;
+}
+
+function ItemIcon({ name, itemId, className = 'real-item-icon' }) {
+  const urls = maplestoryIconUrls(itemId);
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => setIndex(0), [itemId]);
+
+  if (!itemId || index >= urls.length) return <EmojiFallback name={name} />;
+
+  return (
+    <img
+      className={className}
+      src={urls[index]}
+      alt={name || `item ${itemId}`}
+      title={itemId ? `${name} · ${itemId}` : name}
+      loading="lazy"
+      onError={() => setIndex((value) => value + 1)}
+    />
+  );
+}
+
 function countRecipes(data) {
   return (data.disciplines || []).reduce((total, discipline) => total + (discipline.output_types || []).reduce((typeTotal, outputType) => typeTotal + (outputType.levels || []).reduce((levelTotal, level) => levelTotal + (level.recipes || []).length, 0), 0), 0);
 }
@@ -56,7 +111,7 @@ function countByProfession(data, profession) {
   return countRecipes({ disciplines: [discipline] });
 }
 
-function buildMatrixRows(recipes, filter) {
+function buildMatrixRows(recipes, filter, nameToId) {
   const map = new Map();
   const scoped = filter === 'all' ? recipes : recipes.filter((recipe) => recipe.discipline === filter);
 
@@ -66,6 +121,7 @@ function buildMatrixRows(recipes, filter) {
       if (!map.has(name)) {
         map.set(name, {
           name,
+          itemId: resolveItemId(name, nameToId),
           totalQty: 0,
           byProfession: {},
           recipeIds: new Set(),
@@ -177,7 +233,7 @@ function MatrixView({ rows, activeFilter, setActiveFilter }) {
   return (
     <section className="matrix-shell">
       <aside className="craft-rail">
-        {['🧱', '⚒️', '⚔️', '🧵', '🪵', '🛡️', '💎', '🔮', '✨', '⚙️'].map((icon, index) => <span key={index}>{icon}</span>)}
+        {['4011000', '4003000', '4003001', '4011001', '4021000', '4021007', '4000021', '4000026', '4000048', '4021008'].map((itemId, index) => <span key={index}><ItemIcon name={`rail icon ${index + 1}`} itemId={itemId} /></span>)}
       </aside>
       <div className="matrix-card">
         <header className="matrix-hero">
@@ -208,9 +264,10 @@ function MatrixView({ rows, activeFilter, setActiveFilter }) {
               {visibleRows.map((row) => (
                 <tr key={row.name} className={row.name === highest?.name ? 'top-row' : ''}>
                   <td className="material-name">
-                    <span className="mat-icon">{materialIcon(row.name)}</span>
+                    <span className="mat-icon"><ItemIcon name={row.name} itemId={row.itemId} /></span>
                     <div>
                       <strong>{row.name}</strong>
+                      <div className="item-id-line">{row.itemId ? `ID ${row.itemId}` : 'ID not matched'}</div>
                       <div className={`usage-bar ${materialTone(row.name)}`}><i style={{ width: `${Math.max(18, row.score)}%` }} /></div>
                     </div>
                   </td>
@@ -243,7 +300,7 @@ function MaterialsRank({ rows }) {
         {rows.slice(0, 18).map((row, index) => (
           <article key={row.name}>
             <span>{index + 1}</span>
-            <strong>{materialIcon(row.name)} {row.name}</strong>
+            <strong><ItemIcon name={row.name} itemId={row.itemId} /> {row.name}</strong>
             <em>{row.recipeCount} recipes · {row.professionCount} professions</em>
             <div className="score-track"><i style={{ width: `${row.score}%` }} /></div>
             <b>{row.score}/100</b>
@@ -254,17 +311,17 @@ function MaterialsRank({ rows }) {
   );
 }
 
-function Planner({ recipes }) {
+function Planner({ recipes, nameToId }) {
   const plan = makeArrowPlan(recipes);
   return (
     <section className="planner-fx">
       <h2>No-Meso Woodcrafting Planner</h2>
       {!plan ? <p>No zero-meso Woodcrafting recipe found.</p> : <>
         <div className="plan-cards">
-          <div><span>Recipe</span><strong>{plan.recipe.result_item_name}</strong></div>
+          <div><span>Recipe</span><strong><ItemIcon name={plan.recipe.result_item_name} itemId={resolveItemId(plan.recipe.result_item_name, nameToId, plan.recipe.output_id)} /> {plan.recipe.result_item_name}</strong></div>
           <div><span>EXP each</span><strong>{plan.expEach}</strong></div>
           <div><span>Total crafts to Lv.10</span><strong>{formatNumber(plan.totalCrafts)}</strong></div>
-          {plan.mats.map((mat) => <div key={mat.name}><span>{mat.name}</span><strong>×{formatNumber(mat.qty)}</strong></div>)}
+          {plan.mats.map((mat) => <div key={mat.name}><span><ItemIcon name={mat.name} itemId={resolveItemId(mat.name, nameToId)} /> {mat.name}</span><strong>×{formatNumber(mat.qty)}</strong></div>)}
         </div>
         <table className="plan-table"><thead><tr><th>Stage</th><th>Need</th><th>Crafts</th><th>Overflow</th><th>Char Lv.</th></tr></thead><tbody>{plan.stages.map((stage) => <tr key={stage.level}><td>Lv.{stage.level} → {stage.level + 1}</td><td>{stage.expToNext}</td><td>{stage.crafts}</td><td>{stage.overflow}</td><td>{stage.reqCharLevel}</td></tr>)}</tbody></table>
       </>}
@@ -272,13 +329,20 @@ function Planner({ recipes }) {
   );
 }
 
-function RecipesBrowser({ recipes, activeProfession, search }) {
+function RecipesBrowser({ recipes, activeProfession, search, nameToId }) {
   const visible = recipes.filter((recipe) => (activeProfession === 'all' || recipe.discipline === activeProfession) && (!search || recipe.searchText.includes(search.toLowerCase()) || String(recipe.output_id || '').includes(search)));
   return (
     <section className="recipe-browser-fx">
       <h2>{activeProfession === 'all' ? 'All Recipes' : activeProfession} Recipe Browser</h2>
       <div className="recipe-fx-grid">
-        {visible.slice(0, 120).map((recipe) => <article key={`${recipe.discipline}-${recipe.id}-${recipe.result_item_name}`}><strong>{recipe.result_item_name}</strong><span>{recipe.discipline} · Lv.{recipe.level} · +{recipe.craft_exp} EXP</span><em>{formatNumber(recipe.meso_cost)} meso</em><p>{(recipe.ingredients || []).map((ing) => `${ing.item_name} ×${ing.count}`).join(' · ')}</p></article>)}
+        {visible.slice(0, 120).map((recipe) => (
+          <article key={`${recipe.discipline}-${recipe.id}-${recipe.result_item_name}`}>
+            <strong><ItemIcon name={recipe.result_item_name} itemId={resolveItemId(recipe.result_item_name, nameToId, recipe.output_id)} /> {recipe.result_item_name}</strong>
+            <span>{recipe.discipline} · Lv.{recipe.level} · +{recipe.craft_exp} EXP</span>
+            <em>{formatNumber(recipe.meso_cost)} meso</em>
+            <p>{(recipe.ingredients || []).map((ing) => <span className="ingredient-pill" key={`${recipe.id}-${ing.item_name}`}><ItemIcon name={ing.item_name} itemId={resolveItemId(ing.item_name, nameToId)} /> {ing.item_name} ×{ing.count}</span>)}</p>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -286,6 +350,7 @@ function RecipesBrowser({ recipes, activeProfession, search }) {
 
 function App() {
   const [data, setData] = useState(FALLBACK_DATA);
+  const [lookups, setLookups] = useState({ item_names: {} });
   const [expected, setExpected] = useState(EXPECTED_RECIPES);
   const [loading, setLoading] = useState(true);
   const [activeProfession, setActiveProfession] = useState('all');
@@ -295,11 +360,12 @@ function App() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([fetch(CRAFTING_DATA_URL), fetch(OVERVIEW_DATA_URL)])
-      .then(async ([craftingRes, overviewRes]) => {
-        const [crafting, overview] = await Promise.all([craftingRes.json(), overviewRes.json()]);
+    Promise.all([fetch(CRAFTING_DATA_URL), fetch(OVERVIEW_DATA_URL), fetch(LOOKUPS_DATA_URL)])
+      .then(async ([craftingRes, overviewRes, lookupsRes]) => {
+        const [crafting, overview, lookupData] = await Promise.all([craftingRes.json(), overviewRes.json(), lookupsRes.json()]);
         if (!mounted) return;
         setData(crafting);
+        setLookups(lookupData);
         setExpected(Number(overview?.stats?.recipes || EXPECTED_RECIPES));
       })
       .catch(() => setData(FALLBACK_DATA))
@@ -307,10 +373,12 @@ function App() {
     return () => { mounted = false; };
   }, []);
 
+  const nameToId = useMemo(() => buildNameToIdMap(lookups), [lookups]);
   const recipes = useMemo(() => flattenRecipes(data), [data]);
-  const matrixRows = useMemo(() => buildMatrixRows(recipes, activeProfession), [recipes, activeProfession]);
-  const shownRows = useMemo(() => search ? matrixRows.filter((row) => row.name.toLowerCase().includes(search.toLowerCase()) || row.examples.some((example) => example.toLowerCase().includes(search.toLowerCase()))) : matrixRows, [matrixRows, search]);
+  const matrixRows = useMemo(() => buildMatrixRows(recipes, activeProfession, nameToId), [recipes, activeProfession, nameToId]);
+  const shownRows = useMemo(() => search ? matrixRows.filter((row) => row.name.toLowerCase().includes(search.toLowerCase()) || row.examples.some((example) => example.toLowerCase().includes(search.toLowerCase())) || String(row.itemId || '').includes(search)) : matrixRows, [matrixRows, search]);
   const loaded = recipes.length;
+  const matchedIcons = shownRows.filter((row) => row.itemId).length;
 
   return (
     <main className="fantasy-app">
@@ -318,7 +386,7 @@ function App() {
         <div>
           <p>MSCW Crafting Optimizer</p>
           <h1>Crafting Intelligence Dashboard</h1>
-          <span>{loading ? 'Loading current data...' : `${loaded}/${expected} recipes loaded`}</span>
+          <span>{loading ? 'Loading current data...' : `${loaded}/${expected} recipes loaded · ${matchedIcons}/${shownRows.length} visible materials matched to MapleStory.io icons`}</span>
         </div>
         <nav>
           <button className={view === 'matrix' ? 'active' : ''} onClick={() => setView('matrix')}>Matrix</button>
@@ -335,8 +403,8 @@ function App() {
 
       {view === 'matrix' && <MatrixView rows={shownRows} activeFilter={matrixFilter} setActiveFilter={setMatrixFilter} />}
       {view === 'materials' && <MaterialsRank rows={shownRows} />}
-      {view === 'planner' && <Planner recipes={recipes} />}
-      {view === 'recipes' && <RecipesBrowser recipes={recipes} activeProfession={activeProfession} search={search} />}
+      {view === 'planner' && <Planner recipes={recipes} nameToId={nameToId} />}
+      {view === 'recipes' && <RecipesBrowser recipes={recipes} activeProfession={activeProfession} search={search} nameToId={nameToId} />}
     </main>
   );
 }
