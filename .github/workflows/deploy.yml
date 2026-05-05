@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -24,16 +24,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Show versions
         run: |
           node --version
           npm --version
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Prepare public icon assets
+      - name: Organize icon assets
         shell: bash
         run: |
           mkdir -p public/icons
@@ -46,43 +45,75 @@ jobs:
           out.mkdir(parents=True, exist_ok=True)
           exts = {'.png', '.webp', '.jpg', '.jpeg'}
 
+          aliases = {
+              'Processed Cloth.png': 'processed_cloth.png',
+              'processed_cloth.png': 'processed_cloth.png',
+              'Spool of Thread.png': 'spool_of_thread.png',
+              'spool_of_thread.png': 'spool_of_thread.png',
+              'Animal Fur Bundle.png': 'animal_fur_bundle.png',
+              'animal_fur_bundle.png': 'animal_fur_bundle.png',
+              'Processed Leather.png': 'processed_leather.png',
+              'processed_leather.png': 'processed_leather.png',
+              'Processed Parchment.png': 'processed_parchment.png',
+              'processed_parchment.png': 'processed_parchment.png',
+              '04003009.png': '04003009.png',
+              '04003001(1).png': 'processed_wood.png',
+              'processed_wood.png': 'processed_wood.png',
+              'weapon crafting Icon.png': 'weapon_crafting_icon.png',
+              'weapon_crafting_icon.png': 'weapon_crafting_icon.png',
+              'smithing Icon.png': 'smithing_icon.png',
+              'smithing_icon.png': 'smithing_icon.png',
+              'tailoring Icon.png': 'tailoring_icon.png',
+              'tailoring_icon.png': 'tailoring_icon.png',
+              'leatherworking Icon.png': 'leatherworking_icon.png',
+              'leatherworking_icon.png': 'leatherworking_icon.png',
+              'Arcforge Icon.png': 'arcforge_icon.png',
+              'arcforge_icon.png': 'arcforge_icon.png',
+              '916987b4-3066-4302-aec4-38636a3eb047(2).png': 'woodcrafting_icon.png',
+              'woodcrafting_icon.png': 'woodcrafting_icon.png',
+          }
+
           def slug(name: str) -> str:
               stem = Path(name).stem.lower()
               stem = re.sub(r'[^a-z0-9]+', '_', stem).strip('_')
               stem = re.sub(r'_+', '_', stem)
               return stem + Path(name).suffix.lower()
 
-          aliases = {
-              'Processed Cloth.png': 'processed_cloth.png',
-              'Spool of Thread.png': 'spool_of_thread.png',
-              'Animal Fur Bundle.png': 'animal_fur_bundle.png',
-              'Processed Leather.png': 'processed_leather.png',
-              'Processed Parchment.png': 'processed_parchment.png',
-              '04003009.png': '04003009.png',
-              '04003001(1).png': 'processed_wood.png',
-              'weapon crafting Icon.png': 'weapon_crafting_icon.png',
-              'smithing Icon.png': 'smithing_icon.png',
-              'tailoring Icon.png': 'tailoring_icon.png',
-              'leatherworking Icon.png': 'leatherworking_icon.png',
-              'Arcforge Icon.png': 'arcforge_icon.png',
-              '916987b4-3066-4302-aec4-38636a3eb047(2).png': 'woodcrafting_icon.png',
-          }
-
-          copied = []
-          for file in root.iterdir():
+          moved = []
+          for file in sorted(root.iterdir()):
               if not file.is_file() or file.suffix.lower() not in exts:
                   continue
-              targets = {slug(file.name), aliases.get(file.name, '')}
-              for target in filter(None, targets):
-                  dest = out / target
-                  shutil.copy2(file, dest)
-                  copied.append(f'{file.name} -> {dest}')
+              target_name = aliases.get(file.name, slug(file.name))
+              dest = out / target_name
+              if file.resolve() == dest.resolve():
+                  continue
+              shutil.copy2(file, dest)
+              file.unlink()
+              moved.append(f'{file.name} -> {dest}')
 
-          if copied:
-              print('\n'.join(sorted(copied)))
+          if moved:
+              print('\n'.join(moved))
           else:
-              print('No top-level image files found. Using existing public/icons assets if present.')
+              print('No top-level image files to move. public/icons is already organized or no images are present.')
           PY
+
+          git status --short
+
+      - name: Commit organized icons if needed
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Organize PNG icons into public/icons"
+            git push
+          else
+            echo "No icon organization changes to commit."
+          fi
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
       - name: Build
         run: npm run build
