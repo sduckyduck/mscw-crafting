@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -24,93 +24,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Show versions
         run: |
           node --version
           npm --version
-
-      - name: Organize icon assets
-        shell: bash
-        run: |
-          mkdir -p public/icons
-          python3 <<'PY'
-          from pathlib import Path
-          import re, shutil
-
-          root = Path('.')
-          out = Path('public/icons')
-          out.mkdir(parents=True, exist_ok=True)
-          exts = {'.png', '.webp', '.jpg', '.jpeg'}
-
-          aliases = {
-              'Processed Cloth.png': 'processed_cloth.png',
-              'processed_cloth.png': 'processed_cloth.png',
-              'Spool of Thread.png': 'spool_of_thread.png',
-              'spool_of_thread.png': 'spool_of_thread.png',
-              'Animal Fur Bundle.png': 'animal_fur_bundle.png',
-              'animal_fur_bundle.png': 'animal_fur_bundle.png',
-              'Processed Leather.png': 'processed_leather.png',
-              'processed_leather.png': 'processed_leather.png',
-              'Processed Parchment.png': 'processed_parchment.png',
-              'processed_parchment.png': 'processed_parchment.png',
-              '04003009.png': '04003009.png',
-              '04003001(1).png': 'processed_wood.png',
-              'processed_wood.png': 'processed_wood.png',
-              'weapon crafting Icon.png': 'weapon_crafting_icon.png',
-              'weapon_crafting_icon.png': 'weapon_crafting_icon.png',
-              'smithing Icon.png': 'smithing_icon.png',
-              'smithing_icon.png': 'smithing_icon.png',
-              'tailoring Icon.png': 'tailoring_icon.png',
-              'tailoring_icon.png': 'tailoring_icon.png',
-              'leatherworking Icon.png': 'leatherworking_icon.png',
-              'leatherworking_icon.png': 'leatherworking_icon.png',
-              'Arcforge Icon.png': 'arcforge_icon.png',
-              'arcforge_icon.png': 'arcforge_icon.png',
-              '916987b4-3066-4302-aec4-38636a3eb047(2).png': 'woodcrafting_icon.png',
-              'woodcrafting_icon.png': 'woodcrafting_icon.png',
-          }
-
-          def slug(name: str) -> str:
-              stem = Path(name).stem.lower()
-              stem = re.sub(r'[^a-z0-9]+', '_', stem).strip('_')
-              stem = re.sub(r'_+', '_', stem)
-              return stem + Path(name).suffix.lower()
-
-          moved = []
-          for file in sorted(root.iterdir()):
-              if not file.is_file() or file.suffix.lower() not in exts:
-                  continue
-              target_name = aliases.get(file.name, slug(file.name))
-              dest = out / target_name
-              if file.resolve() == dest.resolve():
-                  continue
-              shutil.copy2(file, dest)
-              file.unlink()
-              moved.append(f'{file.name} -> {dest}')
-
-          if moved:
-              print('\n'.join(moved))
-          else:
-              print('No top-level image files to move. public/icons is already organized or no images are present.')
-          PY
-
-          git status --short
-
-      - name: Commit organized icons if needed
-        shell: bash
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Organize PNG icons into public/icons"
-            git push
-          else
-            echo "No icon organization changes to commit."
-          fi
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -118,12 +36,28 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Copy local icon PNGs into Pages output
+        shell: bash
+        run: |
+          mkdir -p dist/icons
+          cp -f smithing_icon.png dist/icons/smithing_icon.png 2>/dev/null || true
+          cp -f weapon_crafting_icon.png dist/icons/weapon_crafting_icon.png 2>/dev/null || true
+          cp -f tailoring_icon.png dist/icons/tailoring_icon.png 2>/dev/null || true
+          cp -f leatherworking_icon.png dist/icons/leatherworking_icon.png 2>/dev/null || true
+          cp -f woodcrafting_icon.png dist/icons/woodcrafting_icon.png 2>/dev/null || true
+          cp -f "arcforge _icon.png" dist/icons/arcforge_icon.png 2>/dev/null || true
+          cp -f arcforge_icon.png dist/icons/arcforge_icon.png 2>/dev/null || true
+          cp -f processed_leather.png dist/icons/processed_leather.png 2>/dev/null || true
+          cp -f processed_parchment.png dist/icons/processed_parchment.png 2>/dev/null || true
+          cp -f spool_of_thread.png dist/icons/spool_of_thread.png 2>/dev/null || true
+          cp -f animal_fur_bundle.png dist/icons/animal_fur_bundle.png 2>/dev/null || true
+          echo "dist/icons files:"
+          find dist/icons -maxdepth 1 -type f | sort
+
       - name: Verify build output
         run: |
           test -f dist/index.html
           test -d dist/icons
-          echo "dist/icons files:"
-          find dist/icons -maxdepth 1 -type f | sort | head -200
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
