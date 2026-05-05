@@ -41,9 +41,27 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Copy root PNG assets into dist
+      - name: Copy root image assets into dist
         run: |
-          find . -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.webp' -o -iname '*.jpg' -o -iname '*.jpeg' \) -print -exec cp {} dist/ \;
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          root = Path('.')
+          dist = Path('dist')
+          dist.mkdir(exist_ok=True)
+          exts = {'.png', '.webp', '.jpg', '.jpeg'}
+          copied = 0
+
+          for path in root.iterdir():
+              if path.is_file() and path.suffix.lower() in exts:
+                  target = dist / path.name
+                  shutil.copy2(path, target)
+                  copied += 1
+                  print(f'copied {path.name} -> {target}')
+
+          print(f'total root image assets copied: {copied}')
+          PY
 
       - name: Verify build output
         run: test -f dist/index.html
