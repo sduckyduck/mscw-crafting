@@ -3,3 +3,4 @@ import './zh-localize.js';
 import './debug-tools.js';
 import './icon-corrections.js';
 import './local-root-icons.js';
+import './interaction-fix.js';
