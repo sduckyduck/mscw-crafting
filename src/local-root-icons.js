@@ -1,6 +1,9 @@
 const BASE_URL = import.meta.env.BASE_URL || '/';
 const ICON_DIR = 'icons/';
 
+// Only keep true local PNG overrides here.
+// Do NOT put normal MapleStory item icons here unless there is no valid MapleStory.io icon.
+// Example: Screw must stay on MapleStory.io item/4003000, not weapon_crafting_icon.png.
 const LOCAL_ICON_FILES = {
   'Processed Cloth': 'processed_cloth.png',
   'Spool of Thread': 'spool_of_thread.png',
@@ -9,7 +12,6 @@ const LOCAL_ICON_FILES = {
   'Processed Leather': 'processed_leather.png',
   'Processed Wood': 'processed_wood.png',
   'Processed Parchment': 'processed_parchment.png',
-  Screw: 'weapon_crafting_icon.png',
 
   Smithing: 'smithing_icon.png',
   Weaponcrafting: 'weapon_crafting_icon.png',
@@ -20,12 +22,13 @@ const LOCAL_ICON_FILES = {
 };
 
 const PROFESSION_ALIASES = {
-  Smithing: ['Smithing', '锻造'],
-  Weaponcrafting: ['Weaponcrafting', 'Weapon', 'Weapon Crafting', '武器制作', '武器'],
+  // Keep Arcforge before Smithing in matching by using longest-alias scoring below.
+  Arcforge: ['Arcforge', 'Arc Forge', '奥术锻造', '奥术'],
+  Weaponcrafting: ['Weaponcrafting', 'Weapon Crafting', 'Weapon', '武器制作', '武器'],
+  Leatherworking: ['Leatherworking', 'Leather Working', '制皮'],
+  Woodcrafting: ['Woodcrafting', 'Wood Crafting', 'Wood', '木工'],
   Tailoring: ['Tailoring', 'Tailor', '裁缝'],
-  Woodcrafting: ['Woodcrafting', 'Wood', '木工'],
-  Leatherworking: ['Leatherworking', 'Leather Working', 'Leather', '制皮'],
-  Arcforge: ['Arcforge', '奥术锻造', '奥术']
+  Smithing: ['Smithing', '锻造']
 };
 
 const ITEM_ALIASES = {
@@ -35,12 +38,26 @@ const ITEM_ALIASES = {
   Leather: ['Leather', '皮革'],
   'Processed Leather': ['Processed Leather', '加工皮革'],
   'Processed Wood': ['Processed Wood', '加工木材'],
-  'Processed Parchment': ['Processed Parchment', '加工羊皮纸', '羊皮纸'],
-  Screw: ['Screw', '螺丝']
+  'Processed Parchment': ['Processed Parchment', '加工羊皮纸', '羊皮纸']
+};
+
+const MAPLESTORY_IO_ITEM_ICONS = {
+  Screw: {
+    aliases: ['Screw', '螺丝'],
+    id: '4003000'
+  }
 };
 
 function iconUrl(fileName) {
   return `${BASE_URL}${ICON_DIR}${encodeURIComponent(fileName).replace(/%2F/g, '/')}`;
+}
+
+function maplestoryIoIconUrl(id) {
+  return `https://maplestory.io/api/GMS/83/item/${id}/icon?resize=2`;
+}
+
+function normalizeText(value) {
+  return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 function iconOwnText(el) {
@@ -60,9 +77,24 @@ function containerText(el) {
   ].filter(Boolean).join(' ');
 }
 
+function scoreAliasMatch(sourceText, alias) {
+  const source = normalizeText(sourceText);
+  const needle = normalizeText(alias);
+  if (!source || !needle) return 0;
+  if (source === needle) return 10000 + needle.length;
+  if (source.includes(needle)) return 1000 + needle.length;
+  return 0;
+}
+
 function matchByAliases(text, aliasMap) {
-  const source = String(text || '').toLowerCase();
-  return Object.entries(aliasMap).find(([, aliases]) => aliases.some((alias) => source.includes(alias.toLowerCase())))?.[0] || null;
+  let best = null;
+  for (const [key, aliases] of Object.entries(aliasMap)) {
+    for (const alias of aliases) {
+      const score = scoreAliasMatch(text, alias);
+      if (score > (best?.score || 0)) best = { key, score };
+    }
+  }
+  return best?.key || null;
 }
 
 function createLocalImg(key, className = 'manual-local-icon') {
@@ -83,6 +115,17 @@ function createLocalImg(key, className = 'manual-local-icon') {
   return img;
 }
 
+function createMapleStoryIoImg(key, itemId, className = 'real-item-icon') {
+  const img = document.createElement('img');
+  img.className = className;
+  img.src = maplestoryIoIconUrl(itemId);
+  img.alt = key;
+  img.title = `${key} · MapleStory.io item ${itemId}`;
+  img.loading = 'lazy';
+  img.dataset.maplestoryIoIcon = itemId;
+  return img;
+}
+
 function replaceIconElement(el, key) {
   if (!key || !LOCAL_ICON_FILES[key]) return false;
   if (el.dataset?.localIcon === key) return false;
@@ -92,24 +135,55 @@ function replaceIconElement(el, key) {
   return true;
 }
 
+function forceMapleStoryIoIcon(el, key, itemId) {
+  if (!key || !itemId) return false;
+  const text = iconOwnText(el);
+  const matched = MAPLESTORY_IO_ITEM_ICONS[key].aliases.some((alias) => scoreAliasMatch(text, alias) > 0);
+  if (!matched) return false;
+  if (el.dataset?.maplestoryIoIcon === itemId) return false;
+
+  if (el.tagName === 'IMG') {
+    const expected = maplestoryIoIconUrl(itemId);
+    if (el.src === expected || el.getAttribute('src') === expected) return false;
+    el.src = expected;
+    el.alt = key;
+    el.title = `${key} · MapleStory.io item ${itemId}`;
+    el.dataset.maplestoryIoIcon = itemId;
+    el.removeAttribute('data-local-icon');
+    return true;
+  }
+
+  const img = createMapleStoryIoImg(key, itemId);
+  el.replaceWith(img);
+  return true;
+}
+
 function patchMaterialIcons(root = document.body) {
   let changed = 0;
+
+  root.querySelectorAll?.('img.real-item-icon, .emoji-fallback, [data-local-icon]').forEach((el) => {
+    for (const [key, config] of Object.entries(MAPLESTORY_IO_ITEM_ICONS)) {
+      if (forceMapleStoryIoIcon(el, key, config.id)) changed += 1;
+    }
+  });
+
   root.querySelectorAll?.('img.real-item-icon, .emoji-fallback').forEach((el) => {
     const key = matchByAliases(iconOwnText(el), ITEM_ALIASES);
     if (replaceIconElement(el, key)) changed += 1;
   });
+
   return changed;
 }
 
 function patchProfessionButton(button) {
-  const key = matchByAliases(button.innerText, PROFESSION_ALIASES);
+  const key = matchByAliases(containerText(button), PROFESSION_ALIASES);
   if (!key) return false;
 
   const existing = button.querySelector('[data-local-icon]');
   if (existing?.dataset?.localIcon === key) return false;
   existing?.remove();
 
-  const target = button.querySelector('b, .head-icon') || button.firstElementChild || button;
+  const target = button.querySelector('b, .head-icon, .profession-local-icon') || button.firstElementChild || button;
   const img = createLocalImg(key, 'profession-local-icon manual-local-icon');
   if (!img) return false;
 
@@ -132,12 +206,12 @@ function setupProfessionSync() {
   document.addEventListener('click', (event) => {
     const tab = event.target.closest?.('.fx-tabs button');
     if (!tab) return;
-    const key = matchByAliases(tab.innerText, PROFESSION_ALIASES);
+    const key = matchByAliases(containerText(tab), PROFESSION_ALIASES);
     if (!key) return;
 
     setTimeout(() => {
       const smartButtons = [...document.querySelectorAll('.smart-prof')];
-      const target = smartButtons.find((button) => matchByAliases(button.innerText, PROFESSION_ALIASES) === key);
+      const target = smartButtons.find((button) => matchByAliases(containerText(button), PROFESSION_ALIASES) === key);
       if (target) {
         target.click();
         console.info(`[MSCWLocalIcons] Synced top profession tab to Smart Guide route: ${key}`);
@@ -157,9 +231,10 @@ function applyLocalIcons(root = document.body) {
 }
 
 function scanLocalIcons() {
-  const rows = [...document.querySelectorAll('[data-local-icon]')].map((el, index) => ({
+  const rows = [...document.querySelectorAll('[data-local-icon], [data-maplestory-io-icon]')].map((el, index) => ({
     index,
-    key: el.dataset.localIcon,
+    key: el.dataset.localIcon || 'MapleStory.io item',
+    maplestoryIoIcon: el.dataset.maplestoryIoIcon || '',
     src: el.getAttribute('src'),
     error: el.dataset.localIconError === '1',
     nearbyText: el.closest('button, article, tr, .ingredient-branch, .smart-mat, .material-name, .ingredient-pill, th')?.innerText?.slice(0, 220) || ''
@@ -170,9 +245,10 @@ function scanLocalIcons() {
 
 function helpLocalIcons() {
   const rows = [
-    { command: 'MSCWLocalIcons.apply()', description: 'Force apply public/icons PNG icons to current page.' },
-    { command: 'MSCWLocalIcons.scan()', description: 'List currently applied local PNG icons.' },
-    { command: 'MSCWLocalIcons.files', description: 'Show expected public/icons PNG filenames.' }
+    { command: 'MSCWLocalIcons.apply()', description: 'Force apply public/icons PNG icons and MapleStory.io item icon exceptions.' },
+    { command: 'MSCWLocalIcons.scan()', description: 'List currently applied local PNG and MapleStory.io override icons.' },
+    { command: 'MSCWLocalIcons.files', description: 'Show expected public/icons PNG filenames.' },
+    { command: 'MSCWLocalIcons.maplestoryIoItems', description: 'Show items that must stay on MapleStory.io icons.' }
   ];
   console.table(rows);
   return rows;
@@ -200,6 +276,7 @@ function installLocalIcons() {
 
 window.MSCWLocalIcons = {
   files: LOCAL_ICON_FILES,
+  maplestoryIoItems: MAPLESTORY_IO_ITEM_ICONS,
   itemAliases: ITEM_ALIASES,
   professionAliases: PROFESSION_ALIASES,
   apply: () => applyLocalIcons(document.body),
@@ -213,4 +290,4 @@ if (document.readyState === 'loading') {
   installLocalIcons();
 }
 
-console.info('[MSCWLocalIcons] public/icons PNG icon override loaded. Run MSCWLocalIcons.help()');
+console.info('[MSCWLocalIcons] public/icons PNG icon override loaded. Screw stays on MapleStory.io item 4003000. Run MSCWLocalIcons.help()');
