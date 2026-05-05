@@ -1,0 +1,270 @@
+.toolbar-bottom {
+  display: grid;
+  grid-template-columns: auto minmax(240px, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.view-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #303947;
+  background: #0f131a;
+  color: #aab4c2;
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+
+.view-tabs button.active,
+.view-tabs button:hover {
+  color: #ffad5c;
+  border-color: rgba(245, 159, 58, 0.55);
+  background: rgba(245, 159, 58, 0.14);
+}
+
+.planner-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 22px;
+  align-items: start;
+}
+
+.planner-main,
+.planner-side,
+.materials-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.planner-side {
+  position: sticky;
+  top: 18px;
+}
+
+.planner-card {
+  border: 1px solid #29313d;
+  background: rgba(20, 25, 33, 0.95);
+  border-radius: 16px;
+  padding: 18px;
+  overflow: hidden;
+}
+
+.planner-card h2,
+.planner-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: #e6edf3;
+}
+
+.planner-card h2 {
+  font-size: 1.35rem;
+}
+
+.planner-card h3 {
+  font-size: 1rem;
+}
+
+.planner-card h3 svg {
+  color: #ff9f43;
+}
+
+.hero-planner-card p,
+.planner-note {
+  color: #9ba5b4;
+  line-height: 1.55;
+}
+
+.planner-controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.planner-controls label {
+  color: #dce5f1;
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+
+.planner-controls select {
+  width: 100%;
+  border: 1px solid #303947;
+  background: #0f131a;
+  color: #e6edf3;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  color: #9ba5b4 !important;
+  font-weight: 600 !important;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
+.planner-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.planner-summary-grid div {
+  border: 1px solid #303947;
+  background: #0d1117;
+  border-radius: 12px;
+  padding: 13px;
+}
+
+.planner-summary-grid span {
+  display: block;
+  color: #8a94a4;
+  font-size: 0.78rem;
+  margin-bottom: 7px;
+}
+
+.planner-summary-grid strong {
+  color: #f7fafc;
+  font-size: 1rem;
+}
+
+.responsive-table {
+  overflow-x: auto;
+}
+
+.planner-table,
+.mastery-table,
+.material-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.planner-table th,
+.planner-table td,
+.mastery-table th,
+.mastery-table td,
+.material-table th,
+.material-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #242b36;
+  text-align: left;
+  font-size: 0.87rem;
+}
+
+.planner-table th,
+.mastery-table th,
+.material-table th {
+  color: #6ca3ff;
+  background: #11161e;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.planner-table td,
+.mastery-table td,
+.material-table td {
+  color: #c7d0df;
+}
+
+.material-panel {
+  overflow: hidden;
+}
+
+.material-table-wrap {
+  padding: 0 18px 18px;
+}
+
+.material-table strong {
+  color: #e6edf3;
+}
+
+.score-cell {
+  display: grid;
+  grid-template-columns: 34px 110px;
+  align-items: center;
+  gap: 9px;
+}
+
+.score-cell span {
+  color: #ffad5c;
+  font-weight: 900;
+}
+
+.score-cell div {
+  height: 8px;
+  background: #242b36;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.score-cell i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa, #f59f3a);
+  border-radius: 999px;
+}
+
+.mini-reset {
+  border: 1px solid #303947;
+  background: #0f131a;
+  color: #aab4c2;
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-weight: 800;
+}
+
+.mini-reset:hover {
+  color: #ffad5c;
+  border-color: rgba(245, 159, 58, 0.55);
+}
+
+.matrix-hit {
+  color: #a7f3c1 !important;
+  font-weight: 800;
+}
+
+.material-list.compact .material-row {
+  grid-template-columns: auto 1fr auto;
+}
+
+@media (max-width: 1120px) {
+  .toolbar-bottom,
+  .planner-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-side {
+    position: static;
+  }
+
+  .planner-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .planner-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .view-tabs button {
+    flex: 1;
+    justify-content: center;
+  }
+}
