@@ -33,27 +33,66 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Prepare public icon assets
+        shell: bash
+        run: |
+          mkdir -p public/icons
+          python3 <<'PY'
+          from pathlib import Path
+          import re, shutil
+
+          root = Path('.')
+          out = Path('public/icons')
+          out.mkdir(parents=True, exist_ok=True)
+          exts = {'.png', '.webp', '.jpg', '.jpeg'}
+
+          def slug(name: str) -> str:
+              stem = Path(name).stem.lower()
+              stem = re.sub(r'[^a-z0-9]+', '_', stem).strip('_')
+              stem = re.sub(r'_+', '_', stem)
+              return stem + Path(name).suffix.lower()
+
+          aliases = {
+              'Processed Cloth.png': 'processed_cloth.png',
+              'Spool of Thread.png': 'spool_of_thread.png',
+              'Animal Fur Bundle.png': 'animal_fur_bundle.png',
+              'Processed Leather.png': 'processed_leather.png',
+              'Processed Parchment.png': 'processed_parchment.png',
+              '04003009.png': '04003009.png',
+              '04003001(1).png': 'processed_wood.png',
+              'weapon crafting Icon.png': 'weapon_crafting_icon.png',
+              'smithing Icon.png': 'smithing_icon.png',
+              'tailoring Icon.png': 'tailoring_icon.png',
+              'leatherworking Icon.png': 'leatherworking_icon.png',
+              'Arcforge Icon.png': 'arcforge_icon.png',
+              '916987b4-3066-4302-aec4-38636a3eb047(2).png': 'woodcrafting_icon.png',
+          }
+
+          copied = []
+          for file in root.iterdir():
+              if not file.is_file() or file.suffix.lower() not in exts:
+                  continue
+              targets = {slug(file.name), aliases.get(file.name, '')}
+              for target in filter(None, targets):
+                  dest = out / target
+                  shutil.copy2(file, dest)
+                  copied.append(f'{file.name} -> {dest}')
+
+          if copied:
+              print('\n'.join(sorted(copied)))
+          else:
+              print('No top-level image files found. Using existing public/icons assets if present.')
+          PY
+
       - name: Build
         run: npm run build
 
-      - name: Copy root image assets into dist
-        shell: bash
-        continue-on-error: true
-        run: |
-          mkdir -p dist
-          shopt -s nullglob nocaseglob
-          copied=0
-          for file in *.png *.webp *.jpg *.jpeg; do
-            cp "$file" dist/
-            echo "copied $file -> dist/$file"
-            copied=$((copied + 1))
-          done
-          echo "total root image assets copied: $copied"
-          echo "dist files:"
-          ls -la dist | head -200
-
       - name: Verify build output
-        run: test -f dist/index.html
+        run: |
+          test -f dist/index.html
+          test -d dist/icons
+          echo "dist/icons files:"
+          find dist/icons -maxdepth 1 -type f | sort | head -200
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
