@@ -1,43 +1,46 @@
 const BASE_URL = import.meta.env.BASE_URL || '/';
+const ICON_DIR = 'icons/';
 
-const ROOT_ICON_FILES = {
-  'Processed Cloth': 'Processed Cloth.png',
-  'Spool of Thread': 'Spool of Thread.png',
-  'Animal Fur Bundle': 'Animal Fur Bundle.png',
-  'Leather': '04003009.png',
-  'Processed Leather': 'Processed Leather.png',
-  'Processed Wood': '04003001(1).png',
-  'Screw': 'weapon crafting Icon.png',
+const LOCAL_ICON_FILES = {
+  'Processed Cloth': 'processed_cloth.png',
+  'Spool of Thread': 'spool_of_thread.png',
+  'Animal Fur Bundle': 'animal_fur_bundle.png',
+  Leather: '04003009.png',
+  'Processed Leather': 'processed_leather.png',
+  'Processed Wood': 'processed_wood.png',
+  'Processed Parchment': 'processed_parchment.png',
+  Screw: 'weapon_crafting_icon.png',
 
-  Smithing: 'smithing Icon.png',
-  Weaponcrafting: 'weapon crafting Icon.png',
-  Tailoring: 'tailoring Icon.png',
-  Woodcrafting: '916987b4-3066-4302-aec4-38636a3eb047(2).png',
-  Leatherworking: 'leatherworking Icon.png',
-  Arcforge: 'Arcforge Icon.png'
+  Smithing: 'smithing_icon.png',
+  Weaponcrafting: 'weapon_crafting_icon.png',
+  Tailoring: 'tailoring_icon.png',
+  Woodcrafting: 'woodcrafting_icon.png',
+  Leatherworking: 'leatherworking_icon.png',
+  Arcforge: 'arcforge_icon.png'
 };
 
 const PROFESSION_ALIASES = {
   Smithing: ['Smithing', '锻造'],
-  Weaponcrafting: ['Weaponcrafting', 'Weapon', '武器制作', '武器'],
+  Weaponcrafting: ['Weaponcrafting', 'Weapon', 'Weapon Crafting', '武器制作', '武器'],
   Tailoring: ['Tailoring', 'Tailor', '裁缝'],
   Woodcrafting: ['Woodcrafting', 'Wood', '木工'],
-  Leatherworking: ['Leatherworking', 'Leather', '制皮'],
+  Leatherworking: ['Leatherworking', 'Leather Working', 'Leather', '制皮'],
   Arcforge: ['Arcforge', '奥术锻造', '奥术']
 };
 
 const ITEM_ALIASES = {
   'Processed Cloth': ['Processed Cloth', '加工布料'],
-  'Spool of Thread': ['Spool of Thread', '线轴'],
-  'Animal Fur Bundle': ['Animal Fur Bundle', '动物毛皮包', '动物毛束'],
+  'Spool of Thread': ['Spool of Thread', 'Thread Spool', '线轴'],
+  'Animal Fur Bundle': ['Animal Fur Bundle', 'Animal Fur', '动物毛皮包', '动物毛束'],
   Leather: ['Leather', '皮革'],
   'Processed Leather': ['Processed Leather', '加工皮革'],
   'Processed Wood': ['Processed Wood', '加工木材'],
+  'Processed Parchment': ['Processed Parchment', '加工羊皮纸', '羊皮纸'],
   Screw: ['Screw', '螺丝']
 };
 
-function rootIconUrl(fileName) {
-  return `${BASE_URL}${encodeURIComponent(fileName).replace(/%2F/g, '/')}`;
+function iconUrl(fileName) {
+  return `${BASE_URL}${ICON_DIR}${encodeURIComponent(fileName).replace(/%2F/g, '/')}`;
 }
 
 function textOf(el) {
@@ -55,26 +58,26 @@ function matchByAliases(text, aliasMap) {
 }
 
 function createLocalImg(key, className = 'manual-local-icon') {
-  const fileName = ROOT_ICON_FILES[key];
+  const fileName = LOCAL_ICON_FILES[key];
   if (!fileName) return null;
   const img = document.createElement('img');
   img.className = className;
-  img.src = rootIconUrl(fileName);
+  img.src = iconUrl(fileName);
   img.alt = key;
-  img.title = `${key} · local root PNG`;
+  img.title = `${key} · local PNG`;
   img.loading = 'lazy';
-  img.dataset.localRootIcon = key;
+  img.dataset.localIcon = key;
   img.onerror = () => {
-    img.dataset.localRootIconError = '1';
+    img.dataset.localIconError = '1';
     img.style.display = 'none';
-    console.warn(`[MSCWLocalIcons] Missing local PNG for ${key}: ${img.src}. Make sure ${fileName} exists in repo root and workflow copies root PNGs to dist.`);
+    console.warn(`[MSCWLocalIcons] Missing local PNG for ${key}: ${img.src}. Expected public/icons/${fileName}.`);
   };
   return img;
 }
 
 function replaceIconElement(el, key) {
-  if (!key || !ROOT_ICON_FILES[key]) return false;
-  if (el.dataset?.localRootIcon === key) return false;
+  if (!key || !LOCAL_ICON_FILES[key]) return false;
+  if (el.dataset?.localIcon === key) return false;
   const img = createLocalImg(key, el.classList?.contains('head-icon-img') ? 'head-icon-img manual-local-icon' : 'real-item-icon manual-local-icon');
   if (!img) return false;
   el.replaceWith(img);
@@ -94,8 +97,8 @@ function patchProfessionButton(button) {
   const key = matchByAliases(button.innerText, PROFESSION_ALIASES);
   if (!key) return false;
 
-  const existing = button.querySelector('[data-local-root-icon]');
-  if (existing?.dataset?.localRootIcon === key) return false;
+  const existing = button.querySelector('[data-local-icon]');
+  if (existing?.dataset?.localIcon === key) return false;
   existing?.remove();
 
   const target = button.querySelector('b, .head-icon') || button.firstElementChild || button;
@@ -146,11 +149,11 @@ function applyLocalIcons(root = document.body) {
 }
 
 function scanLocalIcons() {
-  const rows = [...document.querySelectorAll('[data-local-root-icon]')].map((el, index) => ({
+  const rows = [...document.querySelectorAll('[data-local-icon]')].map((el, index) => ({
     index,
-    key: el.dataset.localRootIcon,
+    key: el.dataset.localIcon,
     src: el.getAttribute('src'),
-    error: el.dataset.localRootIconError === '1',
+    error: el.dataset.localIconError === '1',
     nearbyText: el.closest('button, article, tr, .ingredient-branch, .smart-mat, .material-name, .ingredient-pill, th')?.innerText?.slice(0, 220) || ''
   }));
   console.table(rows);
@@ -159,9 +162,9 @@ function scanLocalIcons() {
 
 function helpLocalIcons() {
   const rows = [
-    { command: 'MSCWLocalIcons.apply()', description: 'Force apply root PNG icons to current page.' },
+    { command: 'MSCWLocalIcons.apply()', description: 'Force apply public/icons PNG icons to current page.' },
     { command: 'MSCWLocalIcons.scan()', description: 'List currently applied local PNG icons.' },
-    { command: 'MSCWLocalIcons.files', description: 'Show expected root PNG filenames.' }
+    { command: 'MSCWLocalIcons.files', description: 'Show expected public/icons PNG filenames.' }
   ];
   console.table(rows);
   return rows;
@@ -188,7 +191,7 @@ function installLocalIcons() {
 }
 
 window.MSCWLocalIcons = {
-  files: ROOT_ICON_FILES,
+  files: LOCAL_ICON_FILES,
   itemAliases: ITEM_ALIASES,
   professionAliases: PROFESSION_ALIASES,
   apply: () => applyLocalIcons(document.body),
@@ -202,4 +205,4 @@ if (document.readyState === 'loading') {
   installLocalIcons();
 }
 
-console.info('[MSCWLocalIcons] Local root PNG icon override loaded. Run MSCWLocalIcons.help()');
+console.info('[MSCWLocalIcons] public/icons PNG icon override loaded. Run MSCWLocalIcons.help()');
