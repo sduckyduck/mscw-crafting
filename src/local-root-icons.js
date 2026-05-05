@@ -43,7 +43,15 @@ function iconUrl(fileName) {
   return `${BASE_URL}${ICON_DIR}${encodeURIComponent(fileName).replace(/%2F/g, '/')}`;
 }
 
-function textOf(el) {
+function iconOwnText(el) {
+  return [
+    el?.getAttribute?.('alt'),
+    el?.getAttribute?.('title'),
+    el?.textContent
+  ].filter(Boolean).join(' ');
+}
+
+function containerText(el) {
   return [
     el?.getAttribute?.('alt'),
     el?.getAttribute?.('title'),
@@ -87,7 +95,7 @@ function replaceIconElement(el, key) {
 function patchMaterialIcons(root = document.body) {
   let changed = 0;
   root.querySelectorAll?.('img.real-item-icon, .emoji-fallback').forEach((el) => {
-    const key = matchByAliases(textOf(el), ITEM_ALIASES);
+    const key = matchByAliases(iconOwnText(el), ITEM_ALIASES);
     if (replaceIconElement(el, key)) changed += 1;
   });
   return changed;
