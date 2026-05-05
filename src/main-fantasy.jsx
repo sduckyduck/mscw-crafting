@@ -1,1 +1,1 @@
-import './main-fantasy-v4.jsx';
+import './main-fantasy-v5.jsx';
