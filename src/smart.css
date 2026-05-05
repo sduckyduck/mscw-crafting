@@ -1,0 +1,243 @@
+.smart-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.smart-hero,
+.smart-card {
+  border: 1px solid rgba(190, 139, 70, .5);
+  background: rgba(10, 15, 24, .93);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 18px 52px rgba(0,0,0,.24);
+}
+
+.smart-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(68, 150, 255, .14), transparent 28rem),
+    linear-gradient(180deg, rgba(16, 28, 48, .95), rgba(8, 13, 22, .96));
+}
+
+.smart-hero p {
+  margin: 0 0 5px;
+  color: #6fa9ff;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: .78rem;
+}
+
+.smart-hero h2 {
+  margin: 0;
+  color: #ffb453;
+  font-size: clamp(1.8rem, 3vw, 3.3rem);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.smart-hero span {
+  display: block;
+  margin-top: 8px;
+  color: #a6b3c8;
+  line-height: 1.5;
+  max-width: 900px;
+}
+
+.smart-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 360px;
+}
+
+.smart-controls label {
+  color: #93a3ba;
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.smart-controls select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid #293954;
+  background: #0b111d;
+  color: #eaf2ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.smart-grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+}
+
+.smart-card h3 {
+  margin: 0 0 14px;
+  color: #ffd38d;
+}
+
+.smart-prof {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 4px 10px;
+  padding: 12px;
+  border: 1px solid #293954;
+  border-radius: 12px;
+  background: #0b111d;
+  margin-bottom: 10px;
+}
+
+.smart-prof.best {
+  border-color: rgba(126, 246, 90, .45);
+  background: linear-gradient(180deg, rgba(40, 91, 34, .28), rgba(9, 17, 28, .9));
+}
+
+.smart-prof span {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: #ffb453;
+  background: rgba(255, 180, 83, .12);
+  border: 1px solid rgba(255, 180, 83, .28);
+  font-weight: 900;
+}
+
+.smart-prof strong {
+  color: #eef5ff;
+}
+
+.smart-prof em {
+  color: #93a3ba;
+  font-style: normal;
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
+.smart-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.smart-summary div,
+.smart-mat {
+  border: 1px solid #293954;
+  border-radius: 12px;
+  background: #0b111d;
+  padding: 12px;
+}
+
+.smart-summary span {
+  display: block;
+  color: #93a3ba;
+  font-size: .78rem;
+  margin-bottom: 6px;
+}
+
+.smart-summary strong {
+  color: #a7ffb6;
+  font-size: 1.2rem;
+}
+
+.smart-route {
+  display: grid;
+  gap: 10px;
+}
+
+.smart-route article {
+  border: 1px solid #293954;
+  background: #0b111d;
+  border-radius: 14px;
+  padding: 13px;
+}
+
+.smart-route b {
+  color: #6fa9ff;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.smart-route strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f0f6ff;
+  margin-bottom: 5px;
+}
+
+.smart-route em {
+  color: #93a3ba;
+  font-style: normal;
+  font-size: .86rem;
+}
+
+.smart-route p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 11px 0 0;
+}
+
+.smart-route p span,
+.smart-mat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.smart-route p span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(89, 124, 172, .12);
+  border: 1px solid rgba(89, 124, 172, .22);
+  color: #b9c8dd;
+  font-size: .84rem;
+}
+
+.smart-mat {
+  margin-bottom: 8px;
+}
+
+.smart-mat strong {
+  flex: 1;
+  color: #eef5ff;
+}
+
+.smart-mat span {
+  color: #a7ffb6;
+  font-weight: 900;
+}
+
+.smart-note {
+  color: #93a3ba;
+  line-height: 1.45;
+  font-size: .86rem;
+}
+
+@media (max-width: 1200px) {
+  .smart-grid,
+  .smart-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .smart-controls {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .smart-controls,
+  .smart-summary {
+    grid-template-columns: 1fr;
+  }
+}
