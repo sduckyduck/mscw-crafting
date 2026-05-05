@@ -1,0 +1,107 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import './fantasy.css';
+
+const CRAFTING = 'https://ohmi69.github.io/osms_datamine_dashboard/data/current/crafting.json';
+const OVERVIEW = 'https://ohmi69.github.io/osms_datamine_dashboard/data/current/overview.json';
+const EXPECTED = 342;
+const REGION = 'GMS';
+const VERSION = '83';
+const PROFESSIONS = ['Smithing', 'Weaponcrafting', 'Tailoring', 'Woodcrafting', 'Leatherworking', 'Arcforge'];
+const META = {
+  Smithing: ['🏆', 'Smithing'],
+  Weaponcrafting: ['⚔️', 'Weapon'],
+  Tailoring: ['🧵', 'Tailor'],
+  Woodcrafting: ['🪵', 'Wood'],
+  Leatherworking: ['🛡️', 'Leather'],
+  Arcforge: ['💎', 'Arcforge']
+};
+
+const CLASSIC = {
+  'bronze ingot': '4011000', 'iron ingot': '4011001', 'steel ingot': '4011001', 'mithril ingot': '4011002', 'adamantium ingot': '4011003', 'silver ingot': '4011004', 'orihalcon ingot': '4011005', 'gold ingot': '4011006',
+  'bronze plate': '4011000', 'steel plate': '4011001', 'mithril plate': '4011002', 'adamantium plate': '4011003', 'silver plate': '4011004', 'orihalcon plate': '4011005', 'gold plate': '4011006',
+  'bronze ore': '4010000', 'iron ore': '4010001', 'steel ore': '4010001', 'mithril ore': '4010002', 'adamantium ore': '4010003', 'silver ore': '4010004', 'orihalcon ore': '4010005', 'gold ore': '4010006',
+  'garnet': '4021000', 'amethyst': '4021001', 'aquamarine': '4021002', 'emerald': '4021003', 'opal': '4021004', 'sapphire': '4021005', 'topaz': '4021006', 'diamond': '4021007', 'black crystal': '4021008',
+  'garnet ore': '4020000', 'amethyst ore': '4020001', 'aquamarine ore': '4020002', 'emerald ore': '4020003', 'opal ore': '4020004', 'sapphire ore': '4020005', 'topaz ore': '4020006', 'diamond ore': '4020007', 'black crystal ore': '4020008',
+  'snail shell': '4000000', 'blue snail shell': '4000001', 'red snail shell': '4000002', 'orange mushroom cap': '4000009', 'green mushroom cap': '4000013', 'blue mushroom cap': '4000016', 'jr. necki skin': '4000018', 'curse eye tail': '4000027', 'drake skull': '4000030', 'clang claw': '4000040',
+  'screw': '4003000', 'processed wood': '4003001', 'firewood': '4003004', 'stiff feather': '4003005', 'leather': '4000021'
+};
+
+const MASTERY = [50, 115, 200, 308, 450, 635, 882, 1190, 1587];
+const CHAR_LV = ['?', 10, 15, 20, 25, 30, 35, 40, 45];
+function norm(x) { return String(x || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+function fmt(x) { return Number(x || 0).toLocaleString(); }
+function iconId(name, rawId) {
+  const k = norm(name);
+  if (CLASSIC[k]) return CLASSIC[k];
+  const id = String(rawId || '');
+  if (/ingot|plate/.test(k) && /^401010\d$/.test(id)) return id.replace('401010', '401100');
+  if (/garnet|amethyst|aquamarine|emerald|opal|sapphire|topaz|diamond|black crystal/.test(k) && /^402010\d$/.test(id)) return id.replace('402010', '402100');
+  return id || null;
+}
+function iconUrl(id) { return id ? `https://maplestory.io/api/${REGION}/${VERSION}/item/${id}/icon?resize=2` : null; }
+function emoji(name) {
+  const x = norm(name);
+  if (x.includes('screw')) return '🔩'; if (x.includes('thread')) return '🧵'; if (x.includes('wood')) return '🪵'; if (x.includes('leather') || x.includes('skin')) return '🛡️'; if (x.includes('crystal') || x.includes('garnet') || x.includes('topaz') || x.includes('sapphire')) return '💎'; if (x.includes('shell')) return '🐚'; if (x.includes('tail')) return '🟣'; return '◇';
+}
+function Icon({ name, id }) {
+  const [bad, setBad] = useState(false);
+  useEffect(() => setBad(false), [id]);
+  if (!id || bad) return <span className="emoji-fallback">{emoji(name)}</span>;
+  return <img className="real-item-icon" src={iconUrl(id)} alt={name} title={`${name} · classic icon ${id}`} loading="lazy" onError={() => setBad(true)} />;
+}
+function flatten(data) {
+  return (data.disciplines || []).flatMap(d => (d.output_types || []).flatMap(t => (t.levels || []).flatMap(l => (l.recipes || []).map(r => ({ ...r, discipline: d.discipline, outputType: t.output_type, level: Number(r.req_level ?? l.level ?? 1), search: [r.result_item_name, ...(r.ingredients || []).map(i => i.item_name)].join(' ').toLowerCase() })))))
+}
+function countRecipes(data, only) {
+  return (data.disciplines || []).filter(d => !only || d.discipline === only).reduce((a, d) => a + (d.output_types || []).reduce((b, t) => b + (t.levels || []).reduce((c, l) => c + (l.recipes || []).length, 0), 0), 0);
+}
+function buildRows(recipes, filter) {
+  const map = new Map();
+  const scoped = filter === 'all' ? recipes : recipes.filter(r => r.discipline === filter);
+  scoped.forEach(r => (r.ingredients || []).forEach(i => {
+    const name = i.item_name;
+    if (!map.has(name)) map.set(name, { name, id: iconId(name), totalQty: 0, byProfession: {}, recipeIds: new Set(), examples: new Set(), levels: new Set() });
+    const row = map.get(name); const q = Number(i.count || 0);
+    row.totalQty += q; row.recipeIds.add(`${r.discipline}-${r.id}-${r.result_item_name}`); row.examples.add(r.result_item_name); row.levels.add(r.level || 1);
+    if (!row.byProfession[r.discipline]) row.byProfession[r.discipline] = { qty: 0, recipes: new Set() };
+    row.byProfession[r.discipline].qty += q; row.byProfession[r.discipline].recipes.add(`${r.id}-${r.result_item_name}`);
+  }));
+  let rows = [...map.values()].map(r => {
+    const pc = Object.keys(r.byProfession).length, rc = r.recipeIds.size, ls = r.levels.size;
+    return { ...r, professionCount: pc, recipeCount: rc, examples: [...r.examples].slice(0, 3), rawScore: r.totalQty * 1.3 + rc * 8 + pc * 26 + ls * 5 };
+  });
+  const max = Math.max(1, ...rows.map(r => r.rawScore));
+  return rows.map(r => ({ ...r, score: Math.round(r.rawScore / max * 100) })).sort((a, b) => b.totalQty - a.totalQty || b.recipeCount - a.recipeCount).slice(0, 30);
+}
+function cellClass(c) { if (!c) return 'empty'; const n = c.recipes.size; return n >= 10 ? 'high' : n >= 3 ? 'medium' : 'single'; }
+function tone(name) { const x = norm(name); if (x.includes('crystal') || x.includes('tail')) return 'purple'; if (x.includes('garnet') || x.includes('topaz') || x.includes('skin')) return 'gold'; if (x.includes('ingot')) return 'green'; return 'blue'; }
+function MatrixCell({ cell }) { return <span className={`matrix-chip ${cellClass(cell)}`}>{cell ? `${fmt(cell.qty)} / ${cell.recipes.size}` : '—'}</span>; }
+function Matrix({ rows, active, setActive }) {
+  const visible = active === 'shared' ? rows.filter(r => r.professionCount >= 2) : active === 'intermediate' ? rows.filter(r => /ingot|processed|screw|cloth|leather|wood/i.test(r.name)) : active === 'raw' ? rows.filter(r => !/ingot|processed|screw/i.test(r.name)) : rows;
+  const top = visible[0];
+  return <section className="matrix-shell"><aside className="craft-rail">{['4011000','4003000','4003001','4011001','4021000','4021007','4000021','4000026','4000048','4021008'].map((id, i) => <span key={i}><Icon name="rail" id={id} /></span>)}</aside><div className="matrix-card"><header className="matrix-hero"><div><h2>Cross-Profession Material Matrix</h2><p>Shows which materials are shared across the six professions.</p></div><div className="matrix-filters">{[['all','All'],['shared','Shared Only'],['intermediate','Craftable Intermediates'],['raw','Raw Mats']].map(([k,l]) => <button key={k} className={active === k ? 'active' : ''} onClick={() => setActive(k)}>{l}</button>)}</div></header><div className="matrix-table-wrap"><table className="fantasy-matrix"><thead><tr><th className="material-col">◇ Material</th><th>Total</th>{PROFESSIONS.map(p => <th key={p}><span className="head-icon">{META[p][0]}</span>{META[p][1]}</th>)}</tr></thead><tbody>{visible.map(r => <tr key={r.name} className={r.name === top?.name ? 'top-row' : ''}><td className="material-name"><span className="mat-icon"><Icon name={r.name} id={r.id} /></span><div><strong>{r.name}</strong><div className="item-id-line">{r.id ? `Classic icon ID ${r.id}` : 'No verified icon ID'}</div><div className={`usage-bar ${tone(r.name)}`}><i style={{ width: `${Math.max(18, r.score)}%` }} /></div></div></td><td className="total-cell">{fmt(r.totalQty)}</td>{PROFESSIONS.map(p => <td key={p}><MatrixCell cell={r.byProfession[p]} /></td>)}</tr>)}</tbody></table></div><footer className="matrix-legend"><div className="legend-how"><strong>How to read</strong><span className="sample-chip">120 / 4</span><em>quantity needed / number of recipes</em></div><div><i className="lg high" />High overlap<br /><small>Used in many recipes</small></div><div><i className="lg medium" />Medium overlap<br /><small>Used in several recipes</small></div><div><i className="lg single" />Single profession<br /><small>Narrow use case</small></div><div className="legend-stat"><b>{visible.length}</b><span>Materials shown</span></div><div className="legend-stat"><b>{fmt(top?.totalQty || 0)}</b><span>Top total qty</span></div></footer></div></section>;
+}
+function Rank({ rows }) { return <section className="rank-panel"><h3>Material Bottleneck Ranking</h3><div className="rank-grid">{rows.slice(0, 18).map((r, i) => <article key={r.name}><span>{i + 1}</span><strong><Icon name={r.name} id={r.id} />{r.name}</strong><em>{r.recipeCount} recipes · {r.professionCount} professions</em><div className="score-track"><i style={{ width: `${r.score}%` }} /></div><b>{r.score}/100</b></article>)}</div></section>; }
+function Planner({ recipes }) {
+  const r = recipes.find(x => x.discipline === 'Woodcrafting' && Number(x.meso_cost || 0) === 0 && Number(x.craft_exp || 0) > 0 && x.result_item_name?.toLowerCase().includes('arrow for bow')) || recipes.find(x => x.discipline === 'Woodcrafting' && Number(x.meso_cost || 0) === 0 && Number(x.craft_exp || 0) > 0);
+  if (!r) return <section className="planner-fx"><h2>No-Meso Woodcrafting Planner</h2><p>No zero-meso Woodcrafting recipe found.</p></section>;
+  const exp = Number(r.craft_exp), stages = MASTERY.map((need, i) => ({ lv: i + 1, need, crafts: Math.ceil(need / exp), overflow: Math.ceil(need / exp) * exp - need, char: CHAR_LV[i] }));
+  const total = stages.reduce((a, s) => a + s.crafts, 0), mats = (r.ingredients || []).map(i => ({ name: i.item_name, qty: Number(i.count || 0) * total, id: iconId(i.item_name) }));
+  return <section className="planner-fx"><h2>No-Meso Woodcrafting Planner</h2><div className="plan-cards"><div><span>Recipe</span><strong><Icon name={r.result_item_name} id={iconId(r.result_item_name, r.output_id)} />{r.result_item_name}</strong></div><div><span>EXP each</span><strong>{exp}</strong></div><div><span>Total crafts to Lv.10</span><strong>{fmt(total)}</strong></div>{mats.map(m => <div key={m.name}><span><Icon name={m.name} id={m.id} />{m.name}</span><strong>×{fmt(m.qty)}</strong></div>)}</div><table className="plan-table"><thead><tr><th>Stage</th><th>Need</th><th>Crafts</th><th>Overflow</th><th>Char Lv.</th></tr></thead><tbody>{stages.map(s => <tr key={s.lv}><td>Lv.{s.lv} → {s.lv + 1}</td><td>{s.need}</td><td>{s.crafts}</td><td>{s.overflow}</td><td>{s.char}</td></tr>)}</tbody></table></section>;
+}
+function Recipes({ recipes, profession, search }) {
+  const visible = recipes.filter(r => (profession === 'all' || r.discipline === profession) && (!search || r.search.includes(search.toLowerCase()) || String(r.output_id || '').includes(search)));
+  return <section className="recipe-browser-fx"><h2>{profession === 'all' ? 'All Recipes' : profession} Recipe Browser</h2><div className="recipe-fx-grid">{visible.slice(0, 120).map(r => <article key={`${r.discipline}-${r.id}-${r.result_item_name}`}><strong><Icon name={r.result_item_name} id={iconId(r.result_item_name, r.output_id)} />{r.result_item_name}</strong><span>{r.discipline} · Lv.{r.level} · +{r.craft_exp} EXP</span><em>{fmt(r.meso_cost)} meso</em><p>{(r.ingredients || []).map(i => <span className="ingredient-pill" key={`${r.id}-${i.item_name}`}><Icon name={i.item_name} id={iconId(i.item_name)} />{i.item_name} ×{i.count}</span>)}</p></article>)}</div></section>;
+}
+function Tabs({ data, active, setActive }) { return <div className="fx-tabs"><button className={active === 'all' ? 'active' : ''} onClick={() => setActive('all')}>All <span>{countRecipes(data)}</span></button>{PROFESSIONS.map(p => <button key={p} className={active === p ? 'active' : ''} onClick={() => setActive(p)}><b>{META[p][0]}</b>{p}<span>{countRecipes(data, p)}</span></button>)}</div>; }
+function App() {
+  const [data, setData] = useState({ disciplines: [] }), [expected, setExpected] = useState(EXPECTED), [loading, setLoading] = useState(true), [profession, setProfession] = useState('all'), [view, setView] = useState('matrix'), [filter, setFilter] = useState('all'), [search, setSearch] = useState('');
+  useEffect(() => { let ok = true; Promise.all([fetch(CRAFTING), fetch(OVERVIEW)]).then(async ([c, o]) => { const [crafting, overview] = await Promise.all([c.json(), o.json()]); if (!ok) return; setData(crafting); setExpected(Number(overview?.stats?.recipes || EXPECTED)); }).catch(() => setData({ disciplines: [] })).finally(() => ok && setLoading(false)); return () => { ok = false; }; }, []);
+  const recipes = useMemo(() => flatten(data), [data]);
+  const rows = useMemo(() => buildRows(recipes, profession), [recipes, profession]);
+  const shown = useMemo(() => search ? rows.filter(r => norm(r.name).includes(norm(search)) || r.examples.some(e => norm(e).includes(norm(search))) || String(r.id || '').includes(search)) : rows, [rows, search]);
+  return <main className="fantasy-app"><section className="fx-header"><div><p>MSCW Crafting Optimizer</p><h1>Crafting Intelligence Dashboard</h1><span>{loading ? 'Loading current data...' : `${recipes.length}/${expected} recipes loaded · name-based classic icon resolver active`}</span></div><nav>{[['matrix','Matrix'],['materials','Materials'],['planner','No-Meso Planner'],['recipes','Recipes']].map(([k,l]) => <button key={k} className={view === k ? 'active' : ''} onClick={() => setView(k)}>{l}</button>)}</nav></section><section className="fx-toolbar"><Tabs data={data} active={profession} setActive={setProfession} /><label className="fx-search"><span>⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search materials, recipes, or item ID..." /></label></section>{view === 'matrix' && <Matrix rows={shown} active={filter} setActive={setFilter} />}{view === 'materials' && <Rank rows={shown} />}{view === 'planner' && <Planner recipes={recipes} />}{view === 'recipes' && <Recipes recipes={recipes} profession={profession} search={search} />}</main>;
+}
+
+createRoot(document.getElementById('root')).render(<App />);
