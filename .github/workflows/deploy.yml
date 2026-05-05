@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
   pages: write
@@ -28,7 +31,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Show versions
         run: |
@@ -42,26 +45,20 @@ jobs:
         run: npm run build
 
       - name: Copy root image assets into dist
+        shell: bash
+        continue-on-error: true
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import shutil
-
-          root = Path('.')
-          dist = Path('dist')
-          dist.mkdir(exist_ok=True)
-          exts = {'.png', '.webp', '.jpg', '.jpeg'}
-          copied = 0
-
-          for path in root.iterdir():
-              if path.is_file() and path.suffix.lower() in exts:
-                  target = dist / path.name
-                  shutil.copy2(path, target)
-                  copied += 1
-                  print(f'copied {path.name} -> {target}')
-
-          print(f'total root image assets copied: {copied}')
-          PY
+          mkdir -p dist
+          shopt -s nullglob nocaseglob
+          copied=0
+          for file in *.png *.webp *.jpg *.jpeg; do
+            cp "$file" dist/
+            echo "copied $file -> dist/$file"
+            copied=$((copied + 1))
+          done
+          echo "total root image assets copied: $copied"
+          echo "dist files:"
+          ls -la dist | head -200
 
       - name: Verify build output
         run: test -f dist/index.html
