@@ -4,6 +4,9 @@ const MAPLESTORY_IO_VERSION = '83';
 // Corrections based on classic MapleStory item-name IDs.
 // This layer intentionally overrides earlier wrong IDs from the app bundle without needing to rebuild every component.
 const CORRECT_ICON_IDS = {
+  'Arrow for Bow': '2060000',
+  'Arrow for Crossbow': '2061000',
+
   'Blue Snail Shell': '4000000',
   'Orange Mushroom Cap': '4000001',
   "Pig's Ribbon": '4000002',
@@ -30,14 +33,60 @@ const CORRECT_ICON_IDS = {
   'Stirge Wing': '4000042',
   'Clang Claw': '4000044',
 
+  // Crafting ETC materials.
+  'Screw': '4003000',
+  'Processed Wood': '4003001',
+  'Stiff Feather': '4003004',
+  'Soft Feather': '4003005',
+
   // Equipment confirmed from the user / classic data.
   'Brown Skullcap': '1002008'
+};
+
+const ICON_ALIASES = {
+  'Arrow for Bow': ['Arrow for Bow', '弓箭矢', '弓箭'],
+  'Arrow for Crossbow': ['Arrow for Crossbow', '弩箭矢', '弩箭'],
+  'Tree Branch': ['Tree Branch', '树枝'],
+  'Stiff Feather': ['Stiff Feather', '硬羽毛'],
+  'Soft Feather': ['Soft Feather', '柔软羽毛'],
+  'Screw': ['Screw', '螺丝'],
+  'Processed Wood': ['Processed Wood', '加工木材'],
+  'Blue Snail Shell': ['Blue Snail Shell', '蓝蜗牛壳'],
+  'Orange Mushroom Cap': ['Orange Mushroom Cap', '花蘑菇盖', '橙蘑菇盖'],
+  "Pig's Ribbon": ["Pig's Ribbon", '猪的蝴蝶结'],
+  'Squishy Liquid': ['Squishy Liquid', '黏稠液体'],
+  'Leaf': ['Leaf', '叶子'],
+  'Octopus Leg': ['Octopus Leg', '章鱼脚'],
+  'Evil Eye Tail': ['Evil Eye Tail', '邪恶眼尾巴'],
+  'Charm of the Undead': ['Charm of the Undead', '亡灵符咒'],
+  'Blue Mushroom Cap': ['Blue Mushroom Cap', '蓝蘑菇盖'],
+  'Slime Bubble': ['Slime Bubble', '绿水灵泡泡'],
+  'Mushroom Spore': ['Mushroom Spore', '蘑菇孢子'],
+  'Green Mushroom Cap': ['Green Mushroom Cap', '绿蘑菇盖'],
+  'Curse Eye Tail': ['Curse Eye Tail', '诅咒眼尾巴'],
+  'Drake Skull': ['Drake Skull', '幼龙头骨'],
+  'Horny Mushroom Cap': ['Horny Mushroom Cap', '刺蘑菇盖'],
+  'Red Snail Shell': ['Red Snail Shell', '红蜗牛壳'],
+  "Pig's Head": ["Pig's Head", '猪头'],
+  'Firewood': ['Firewood', '木柴'],
+  'Snail Shell': ['Snail Shell', '蜗牛壳'],
+  'Leather': ['Leather', '皮革'],
+  'Dragon Skin': ['Dragon Skin', '龙皮'],
+  'Jr. Necki Skin': ['Jr. Necki Skin', '小青蛇皮'],
+  'Stirge Wing': ['Stirge Wing', '蝙蝠翅膀'],
+  'Clang Claw': ['Clang Claw', '机械章鱼爪'],
+  'Brown Skullcap': ['Brown Skullcap', '棕色小帽']
 };
 
 const TEXT_CORRECTIONS = {
   'Animal Fur Bundle': '动物毛皮包',
   'Brown Skullcap': '棕色小帽',
-  'Orange Mushroom Cap': '花蘑菇盖'
+  'Orange Mushroom Cap': '花蘑菇盖',
+  'Tree Branch': '树枝',
+  'Stiff Feather': '硬羽毛',
+  'Soft Feather': '柔软羽毛',
+  'Arrow for Bow': '弓箭矢',
+  'Arrow for Crossbow': '弩箭矢'
 };
 
 function normalize(value) {
@@ -48,18 +97,50 @@ function iconUrl(id) {
   return `https://maplestory.io/api/${MAPLESTORY_IO_REGION}/${MAPLESTORY_IO_VERSION}/item/${id}/icon?resize=2`;
 }
 
-function findNameInText(text, mapping = CORRECT_ICON_IDS) {
-  const value = String(text || '').toLowerCase();
-  return Object.keys(mapping).find((name) => value.includes(name.toLowerCase())) || null;
+function scoreAliasMatch(text, alias) {
+  const value = normalize(text);
+  const needle = normalize(alias);
+  if (!value || !needle) return 0;
+  if (value === needle) return 10000 + needle.length;
+  if (value.includes(needle)) return 1000 + needle.length;
+  return 0;
+}
+
+function findNameInText(text) {
+  let best = null;
+  for (const name of Object.keys(CORRECT_ICON_IDS)) {
+    const aliases = ICON_ALIASES[name] || [name];
+    for (const alias of aliases) {
+      const score = scoreAliasMatch(text, alias);
+      if (score > (best?.score || 0)) best = { name, score };
+    }
+  }
+  return best?.name || null;
+}
+
+function ownIconText(el) {
+  return [
+    el.getAttribute?.('alt'),
+    el.getAttribute?.('title'),
+    el.textContent
+  ].filter(Boolean).join(' ');
+}
+
+function nearbyText(el) {
+  return [
+    ownIconText(el),
+    el.closest?.('article, tr, .ingredient-branch, .smart-mat, .material-name, .ingredient-pill')?.innerText
+  ].filter(Boolean).join(' ');
 }
 
 function correctionForElement(el) {
-  const text = [
-    el.getAttribute?.('alt'),
-    el.getAttribute?.('title'),
-    el.closest?.('article, tr, .ingredient-branch, .smart-mat, .material-name, .ingredient-pill')?.innerText
-  ].filter(Boolean).join(' ');
-  const name = findNameInText(text);
+  // Important: for real <img> icons, use only the icon's own alt/title/text.
+  // Using the parent recipe card caused result icons such as Arrow for Bow to be mistaken for ingredient icons such as Tree Branch.
+  let name = findNameInText(ownIconText(el));
+
+  // Emoji fallback spans usually carry the item name in the title, but keep a narrow fallback for old renders.
+  if (!name && el.classList?.contains('emoji-fallback')) name = findNameInText(nearbyText(el));
+
   if (!name) return null;
   return { name, id: CORRECT_ICON_IDS[name], url: iconUrl(CORRECT_ICON_IDS[name]) };
 }
@@ -71,6 +152,8 @@ function patchImage(img) {
     img.src = correction.url;
     img.setAttribute('data-mscw-corrected-icon', correction.id);
     img.setAttribute('title', `${TEXT_CORRECTIONS[correction.name] || correction.name} · corrected icon ${correction.id}`);
+    img.setAttribute('alt', TEXT_CORRECTIONS[correction.name] || correction.name);
+    img.removeAttribute('data-local-icon');
     return true;
   }
   return false;
@@ -82,7 +165,7 @@ function replaceFallback(el) {
   const img = document.createElement('img');
   img.className = 'real-item-icon';
   img.src = correction.url;
-  img.alt = correction.name;
+  img.alt = TEXT_CORRECTIONS[correction.name] || correction.name;
   img.title = `${TEXT_CORRECTIONS[correction.name] || correction.name} · corrected icon ${correction.id}`;
   img.loading = 'lazy';
   img.setAttribute('data-mscw-corrected-icon', correction.id);
@@ -142,7 +225,7 @@ function applyIconCorrections(root = document.body) {
   let images = 0;
   let fallbacks = 0;
 
-  root.querySelectorAll?.('img.real-item-icon').forEach((img) => {
+  root.querySelectorAll?.('img.real-item-icon, img[data-local-icon]').forEach((img) => {
     if (patchImage(img)) images += 1;
   });
 
@@ -156,15 +239,16 @@ function applyIconCorrections(root = document.body) {
 
 function inspectExpectedIcon(name) {
   const exactKey = Object.keys(CORRECT_ICON_IDS).find((key) => normalize(key) === normalize(name));
-  if (!exactKey) {
+  const aliasKey = exactKey || findNameInText(name);
+  if (!aliasKey) {
     console.warn(`[MSCWIconFixes] No corrected icon ID registered for: ${name}`);
     return null;
   }
   const result = {
-    name: exactKey,
-    id: CORRECT_ICON_IDS[exactKey],
-    url: iconUrl(CORRECT_ICON_IDS[exactKey]),
-    translation: TEXT_CORRECTIONS[exactKey] || null
+    name: aliasKey,
+    id: CORRECT_ICON_IDS[aliasKey],
+    url: iconUrl(CORRECT_ICON_IDS[aliasKey]),
+    translation: TEXT_CORRECTIONS[aliasKey] || null
   };
   console.table([result]);
   return result;
@@ -186,7 +270,9 @@ function scanCorrectedIcons() {
 
 function helpCorrections() {
   const rows = [
-    { command: "MSCWIconFixes.expected('Orange Mushroom Cap')", description: 'Show expected corrected icon ID and URL.' },
+    { command: "MSCWIconFixes.expected('Arrow for Bow')", description: 'Show expected arrow icon ID and URL.' },
+    { command: "MSCWIconFixes.expected('Tree Branch')", description: 'Show expected Tree Branch icon ID and URL.' },
+    { command: "MSCWIconFixes.expected('Stiff Feather')", description: 'Show expected Stiff Feather icon ID and URL.' },
     { command: 'MSCWIconFixes.apply()', description: 'Force-apply icon and text corrections to the current page.' },
     { command: 'MSCWIconFixes.scan()', description: 'List elements corrected by this patch layer.' },
     { command: 'MSCWIconFixes.map', description: 'Show the current corrected name → ID map.' }
@@ -219,6 +305,7 @@ function installCorrections() {
 
 window.MSCWIconFixes = {
   map: CORRECT_ICON_IDS,
+  aliases: ICON_ALIASES,
   translations: TEXT_CORRECTIONS,
   apply: () => applyIconCorrections(document.body),
   scan: scanCorrectedIcons,
@@ -238,4 +325,4 @@ if (document.readyState === 'loading') {
   installCorrections();
 }
 
-console.info('[MSCWIconFixes] Correction tools loaded. Run MSCWIconFixes.help()');
+console.info('[MSCWIconFixes] Correction tools loaded. Arrow icons no longer inherit ingredient icons. Run MSCWIconFixes.help()');
