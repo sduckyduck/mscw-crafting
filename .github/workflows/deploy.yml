@@ -41,6 +41,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Copy root PNG assets into dist
+        run: |
+          find . -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.webp' -o -iname '*.jpg' -o -iname '*.jpeg' \) -print -exec cp {} dist/ \;
+
       - name: Verify build output
         run: test -f dist/index.html
 
